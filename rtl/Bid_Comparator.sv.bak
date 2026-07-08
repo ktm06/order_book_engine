@@ -1,0 +1,15 @@
+`timescale 1ns/1ps
+
+module Bid_Comparator 
+#( 
+	parameter CLK_RATE_HZ = 50000000
+) (
+	input logic CLK,
+	input logic v1,
+	input logic v2,
+	input logic v3,
+	input logic v4,
+	output logic best_bid
+)
+
+

@@ -1,0 +1,72 @@
+`timescale 1ns/1ps
+module TF_Message_Parser();
+	localparam CLK_RATE_HZ = 50000000;
+	localparam CLK_RATE_PER = ((1.0 / CLK_RATE_HZ) * 1000000000.0)/ 2;
+	
+	logic CLK;
+	initial 
+	begin
+		CLK = 1'b0;
+		forever #(CLK_RATE_PER) CLK = ~CLK;
+	end
+	
+	initial
+	begin
+		RESET = 1'b1;
+		#500;
+		@(posedge CLK) RESET = 1'b0;
+	end
+	//UUT
+	logic byteready;
+	logic [7:0] inbits;
+	logic messageready;
+	logic [79:0] parsed_message;
+	
+	MessageParser #(
+		.CLK_RATE_HZ (CLK_RATE_HZ),
+		.DATA_BITS(8),
+		.MESSAGE_LENGTH(10)
+	) uut (
+		.byteready (byteready),
+		.inbits (inbits),
+		.messageready (messageready),
+		.parsed_message (parsed_message),
+		.CLK (CLK),
+		.RESET (RESET)
+	);
+	//send_byte task
+	task send_byte(input [7:0] b);
+	begin 
+		@(posedge CLK);
+		inbits = b;
+		byteready = 1'b1;
+		@(posedge CLK);
+		byteready = 1'b0;
+	end
+	endtask
+	
+	initial begin
+		byteready = 1'b0;
+		inbits = 8'b0;
+		wait(~RESET);
+		#500;
+		@(posedge CLK);	
+		send_byte(8'hA0);
+        	send_byte(8'hA1);
+        	send_byte(8'hA2);
+        	send_byte(8'hA3);
+        	send_byte(8'hA4);
+        	send_byte(8'hA5);
+        	send_byte(8'hA6);
+        	send_byte(8'hA7);
+        	send_byte(8'hA8);
+        	send_byte(8'hA9);
+		@(posedge CLK); //one cycle, letting parser process
+		@(posedge CLK); //ensure output settle
+		if (parsed_message === 80'hA0A1A2A3A4A5A6A7A8A9)
+			$display("Pass : %h", parsed_message);
+		else
+			$display("Fail: %h", parsed_message);
+		$finish;
+end
+endmodule
