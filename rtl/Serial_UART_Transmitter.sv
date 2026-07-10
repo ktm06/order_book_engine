@@ -72,12 +72,12 @@ module Serial_UART_Transmitter
 	
 	reg [5:0] State;
 	localparam [5:0]
-	S0 = 6'b000001;
-	S1 = 6'b000010;
-	S2 = 6'b000100;
-	S3 = 6'b001000;
-	S4 = 6'b010000;
-	S5 = 5'b100000;
+	S0 = 6'b000001,
+	S1 = 6'b000010,
+	S2 = 6'b000100,
+	S3 = 6'b001000,
+	S4 = 6'b010000,
+	S5 = 6'b100000;
 	
 	always @(posedge CLK, posedge RESET)
 	begin
@@ -93,26 +93,57 @@ module Serial_UART_Transmitter
 			case (State)
 				S0:
 					begin
-						TX_Done <=1'b0;
+						TX_DONE <=1'b0;
+						
+						if (TX_SEND)
+							begin
+								State <= S1;
+							end
+						else begin
+							State <= S0;
+						end
 					end
 				S1: 
 					begin 
 						tx_frame_data_reg <= {TX_DATA, {START_BITS{1'b0}} };
+						State <= S2;
+						
 					end
 				S2:
 					begin
+						if (BAUD_TICK)
+							begin
+								State <= S3;
+							end
+						else begin
+							State <= S2;
+						end
 					end
 				S3: 
 					begin
+	
 						UART_TX <= tx_frame_data_reg[0];
+							if (tx_bit_counter_done)
+								begin
+									State <= S5;
+								end
+							else begin
+								State <= S4;
+							end
 					end
 				S4:
 					begin
 						tx_frame_data_reg <= {1'b1, tx_frame_data_reg[FRAME_WIDTH-1:1] };
+						State <= S2;
 					end
-				
-	end
-	
+				S5:
+					begin
+						TX_DONE <=1'b1;
+						State <=S0;
+					end
+				endcase
+end
+end
 	
 	
 endmodule
