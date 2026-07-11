@@ -13,7 +13,7 @@ module Bid_Comparator
 	input logic [31:0] p3,
 	output logic [1:0] best_bid_num,
 	output logic [31:0] best_bid_price,
-	output logic valid_best_bid
+	output logic validout
 );
 logic [31:0] price1;
 logic [31:0] price2;
@@ -48,7 +48,7 @@ always_comb begin
 	end else begin
 		best_bid_num = 2'b00;
 	end
-    valid_best_bid = v0 | v1 | v2 | v3;
+    validout = v0 | v1 | v2 | v3;
 end
 
 endmodule
