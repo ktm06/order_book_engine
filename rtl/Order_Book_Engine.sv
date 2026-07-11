@@ -178,31 +178,31 @@ always_ff @(posedge CLK, RESET) begin
 				if (current_side = 8'h0) begin // Ask
 					tempfind <= find_price(curr_price, ask_buffer);
 					if (tempfind[2] == 1'b0) begin // not found so add
-						if bid_count < 4 begin
-							bid_buffer[bid_count] <= {curr_price, curr_size};
-							bid_count <= bid_count + 1;
-						end else begin // drop high with bid comparator
-							bid_buffer[lowestbidpos] <= {curr_price, curr_size};
-						end
-					end else begin // append to existing
-						tempsize <= ((bid_buffer[tempfind[1:0]][31:0] + curr_size) > 32'hFFFFFFFF ? 32'hFFFFFFFF :
-							bid_buffer[tempfind[1:0]][31:0] + curr_size);
-						bid_buffer[tempfind[1:0]] <= {curr_price, tempsize};
-					end
-					State <= S0;
-				end else if (current_side = 8'h1) begin // Bid
-					tempfind <= find_price(curr_price, ask_buffer);
-					if (tempfind[2] == 1'b0) begin
 						if ask_count < 4 begin
 							ask_buffer[ask_count] <= {curr_price, curr_size};
 							ask_count <= ask_count + 1;
-						end else begin // drop low with ask comparator
+						end else begin // drop high with bid comparator
 							ask_buffer[highestaskpos] <= {curr_price, curr_size};
 						end
-					end else begin 
+					end else begin // append to existing
 						tempsize <= ((ask_buffer[tempfind[1:0]][31:0] + curr_size) > 32'hFFFFFFFF ? 32'hFFFFFFFF :
 							ask_buffer[tempfind[1:0]][31:0] + curr_size);
 						ask_buffer[tempfind[1:0]] <= {curr_price, tempsize};
+					end
+					State <= S0;
+				end else if (current_side = 8'h1) begin // Bid
+					tempfind <= find_price(curr_price, bid_buffer);
+					if (tempfind[2] == 1'b0) begin
+						if bid_count < 4 begin
+							bid_buffer[bid_count] <= {curr_price, curr_size};
+							bid_count <= bid_count + 1;
+						end else begin // drop low with ask comparator
+							bid_buffer[lowestbidpos] <= {curr_price, curr_size};
+						end
+					end else begin 
+						tempsize <= ((bid_buffer[tempfind[1:0]][31:0] + curr_size) > 32'hFFFFFFFF ? 32'hFFFFFFFF :
+							bid_buffer[tempfind[1:0]][31:0] + curr_size);
+						bid_buffer[tempfind[1:0]] <= {curr_price, tempsize};
 					end
 					State <= S0;
 				end else begin 
@@ -212,7 +212,28 @@ always_ff @(posedge CLK, RESET) begin
 			end 
 			S3: begin
 				if (current_side = 8'h0) begin //ask
-
+					tempfind <= find_price(curr_price, ask_buffer);
+					if (tempfind[2] == 1'b1) begin
+						ask_buffer[tempfind[1:0]] <= ((ask_buffer[tempfind[1:0]][31:0] - curr_size) < 32'b0 ? 32'b0 
+						: ask_buffer[tempfind[1:0]][31:0] - curr_size);
+						State <= S0;
+					end else begin
+						// TODO err case for now do nothing
+						State <= S0;
+					end
+				end else if (current_side = 8'h1) begin // bid
+					tempfind <= find_price(curr_price, bid_buffer);
+					if (tempfind[2] == 1'b1) begin
+						bid_buffer[tempfind[1:0]] <= ((bid_buffer[tempfind[1:0]][31:0] - curr_size) < 32'b0 ? 32'b0 
+						: bid_buffer[tempfind[1:0]][31:0] - curr_size);
+						State <= S0;
+					end else begin
+						// TODO err case for now do nothing
+						State <= S0;
+					end
+				end else begin 
+					// TODO err case for now do nothing
+					State <= S0;
 				end
 			end
 
