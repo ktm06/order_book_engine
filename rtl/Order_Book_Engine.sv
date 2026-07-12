@@ -3,7 +3,6 @@
 module Order_Book_Engine
 #(
 	parameter CLK_RATE_HZ = 50000000
-
 ) (
 	input [31:0] price,
 	input [31:0] size,
@@ -17,13 +16,14 @@ module Order_Book_Engine
 
 logic [63:0] ask_buffer [0:3]; // stores 4  8 byte messages. message format [63:32] price [31:0] size
 logic [63:0] bid_buffer [0:3];
-logic [1:0] ask_count;
-logic [1:0] bid_count;
+logic [2:0] ask_count;
+logic [2:0] bid_count;
 
 logic validask0, validask1, validask2, validask3;
 logic validbid0, validbid1, validbid2, validbid3;
 logic [1:0] best_bid_num, best_ask_num;
 logic [31:0] best_bid_price, best_ask_price;
+logic [31:0] highest_curr_ask, lowest_curr_bid;
 
 logic bidready, askready;
 
@@ -40,7 +40,7 @@ always_comb begin // check for valid stored based on contents of buffer
 	validbid3 = (bid_buffer[3] == 64'b0 ? 1'b0 : 1'b1);
 end
 
-Bid_Compare Bid_Comparator (
+Bid_Comparator Bid_Compare  (
 	.v0(validbid0),
 	.v1(validbid1),
 	.v2(validbid2),
@@ -52,9 +52,9 @@ Bid_Compare Bid_Comparator (
 	.best_bid_num(best_bid_num),
 	.best_bid_price(best_bid_price),
 	.validout(bidready)
-)
+);
 
-Ask_Compare Ask_Comparator (
+Ask_Comparator Ask_Compare (
 	.v0(validask0),
 	.v1(validask1),
 	.v2(validask2),
@@ -66,40 +66,40 @@ Ask_Compare Ask_Comparator (
 	.best_ask(best_ask_num),
 	.ask_price(best_ask_price),
 	.validout(askready)
-)
+);
 
 
 // when the buffers r full we need a way to kick out the "worst" 
 // contents so we can add new vals. we just reuse the comparators
 // to achieve this
-Lowest_Bid_Finder Ask_Comparator (
-	.v0(1'b1),
-	.v1(1'b1),
-	.v2(1'b1),
-	.v3(1'b1),
+Ask_Comparator Lowest_Bid_Finder (
+	.v0(validbid0),
+	.v1(validbid1),
+	.v2(validbid2),
+	.v3(validbid3),
 	.p0(bid_buffer[0][63:32]),
 	.p1(bid_buffer[1][63:32]),
 	.p2(bid_buffer[2][63:32]),
 	.p3(bid_buffer[3][63:32]),
 	.best_ask(lowestbidpos),
-	.best_bid_num(),
+	.ask_price(lowest_curr_bid),
 	.validout()
-)
+);
 
-Highest_Ask_Finder Bid_Comparator (
-	.v0(1'b1),
-	.v1(1'b1),
-	.v2(1'b1),
-	.v3(1'b1),
+Bid_Comparator Highest_Ask_Finder (
+	.v0(validask0),
+	.v1(validask1),
+	.v2(validask2),
+	.v3(validask3),
 	.p0(ask_buffer[0][63:32]),
 	.p1(ask_buffer[1][63:32]),
 	.p2(ask_buffer[2][63:32]),
 	.p3(ask_buffer[3][63:32]),
-	.best_bid_val(highestaskpos),
-	.best_bid_price(),
+	.best_bid_num(highestaskpos),
+	.best_bid_price(highest_curr_ask),
 	.validout()
 
-)
+);
 
 always_comb begin  // evaluate spread
 	if (bidready & askready) begin
@@ -123,9 +123,8 @@ typedef enum logic [4:0] {
 } State_t;
 
 
-logic [2:0] tempfind; // we will use this for find_price func in alwaysff block
-logic [31:0] tempsize; // for capping sum at 4 bytes
-function automatic logic [1:0] find_price(
+
+function automatic logic [2:0] find_price(
 	input logic [31:0] inprice,
 	input logic [63:0] buffer [0:3]
 );
@@ -133,20 +132,44 @@ function automatic logic [1:0] find_price(
 	// the type, and [2] will be 1 if found, 0 if not found
 	for (int i = 0; i < 4; i++) begin
 		if (buffer[i][63:32] == inprice) begin
-			return {1'b1, 2'i};
-		end else begin
-			return 3'b0;
+			return {1'b1, i[1:0]};
+		end 
+	end
+	return 3'b0;
+endfunction
+
+function automatic logic [2:0] find_total_valids(
+	input logic [63:0] buffer [0:3]
+);
+	logic [2:0] count;
+	count = 3'b0;
+	for (int i = 0; i < 4; i++) begin
+		if (buffer[i] != 64'b0) begin
+			count = count + 1;
 		end
 	end
+	return count;
 endfunction
+
+logic [2:0] bid_find, ask_find; 
+logic [31:0] ask_size, bid_size;
+logic [31:0] sumask, sumbid;
+assign ask_find = find_price(curr_price, ask_buffer);
+assign bid_find = find_price(curr_price, bid_buffer);
+assign ask_size = (ask_find[2] == 1'b1 ? ask_buffer[ask_find[1:0]][31:0] : 32'b0);
+assign bid_size = (bid_find[2] == 1'b1 ? bid_buffer[bid_find[1:0]][31:0] : 32'b0);
+assign ask_count = find_total_valids(ask_buffer);
+assign bid_count = find_total_valids(bid_buffer);
 
 State_t State;
 
 
-always_ff @(posedge CLK, RESET) begin
+always_ff @(posedge CLK, posedge RESET) begin
 	if (RESET) begin
-		ask_buffer <= '0;
-		bid_buffer <= '0;
+		for (int i = 0; i < 4; i++) begin
+			bid_buffer[i] <= '0;
+			ask_buffer[i] <= '0;
+		end
 		State <= S0;
 		curr_price <= '0;
 		curr_size <= '0;
@@ -164,45 +187,43 @@ always_ff @(posedge CLK, RESET) begin
 				end else begin
 					State <= S0;
 				end
+			end
 			S1: begin
-				if (curr_msgtype = 8'h01) begin
+				if (curr_msgtype == 8'h01) begin
 					State <= S2; // add
-				end else if (curr_msgtype = 8'h02) begin
+				end else if (curr_msgtype == 8'h02) begin
 					State <= S3;
-				end else if (curr_msgtype = 8'h03) begin
+				end else if (curr_msgtype == 8'h03) begin
 					State <= S4;
 				end else begin
 					State <= S0;
 				end
-			S2: begin
-				if (current_side = 8'h0) begin // Ask
-					tempfind <= find_price(curr_price, ask_buffer);
-					if (tempfind[2] == 1'b0) begin // not found so add
-						if ask_count < 4 begin
-							ask_buffer[ask_count] <= {curr_price, curr_size};
-							ask_count <= ask_count + 1;
+			end
+			S2: begin // add
+				if (curr_side == 8'h0) begin // Ask
+					if (ask_find[2] == 1'b0) begin // not found so add
+						if (ask_count < 4) begin
+							for (int i = 0; i < 4; i++) begin
+								if (ask_buffer[i] == '0) ask_buffer[i] <= {curr_price, curr_size};
+							end
 						end else begin // drop high with bid comparator
-							ask_buffer[highestaskpos] <= {curr_price, curr_size};
+							if (curr_price < highest_curr_ask) ask_buffer[highestaskpos] <= {curr_price, curr_size};
 						end
 					end else begin // append to existing
-						tempsize <= ((ask_buffer[tempfind[1:0]][31:0] + curr_size) > 32'hFFFFFFFF ? 32'hFFFFFFFF :
-							ask_buffer[tempfind[1:0]][31:0] + curr_size);
-						ask_buffer[tempfind[1:0]] <= {curr_price, tempsize};
+						ask_buffer[ask_find[1:0]][31:0] <= ask_buffer[ask_find[1:0]][31:0] + curr_size; // we assume we dont approach 4.3 billion shares
 					end
 					State <= S0;
-				end else if (current_side = 8'h1) begin // Bid
-					tempfind <= find_price(curr_price, bid_buffer);
-					if (tempfind[2] == 1'b0) begin
-						if bid_count < 4 begin
-							bid_buffer[bid_count] <= {curr_price, curr_size};
-							bid_count <= bid_count + 1;
-						end else begin // drop low with ask comparator
-							bid_buffer[lowestbidpos] <= {curr_price, curr_size};
+				end else if (curr_side == 8'h1) begin // Bid
+					if (bid_find[2] == 1'b0) begin
+						if (bid_count < 4) begin
+							for (int i = 0; i < 4; i++) begin
+								if (bid_buffer[i] == '0) bid_buffer[i] <= {curr_price, curr_size};
+							end
+							end else begin // drop low with ask comparator
+							if (curr_price > lowest_curr_bid) bid_buffer[lowestbidpos] <= {curr_price, curr_size};
 						end
 					end else begin 
-						tempsize <= ((bid_buffer[tempfind[1:0]][31:0] + curr_size) > 32'hFFFFFFFF ? 32'hFFFFFFFF :
-							bid_buffer[tempfind[1:0]][31:0] + curr_size);
-						bid_buffer[tempfind[1:0]] <= {curr_price, tempsize};
+						bid_buffer[bid_find[1:0]][31:0] <= bid_buffer[bid_find[1:0]][31:0] + curr_size;
 					end
 					State <= S0;
 				end else begin 
@@ -210,37 +231,62 @@ always_ff @(posedge CLK, RESET) begin
 					State <= S0;
 				end
 			end 
-			S3: begin
-				if (current_side = 8'h0) begin //ask
-					tempfind <= find_price(curr_price, ask_buffer);
-					if (tempfind[2] == 1'b1) begin
-						ask_buffer[tempfind[1:0]] <= ((ask_buffer[tempfind[1:0]][31:0] - curr_size) < 32'b0 ? 32'b0 
-						: ask_buffer[tempfind[1:0]][31:0] - curr_size);
+			S3: begin // delete
+				if (curr_side == 8'h0) begin //ask
+					if (ask_find[2] == 1'b1) begin
+						if (curr_size >= ask_buffer[ask_find[1:0]][31:0]) begin
+							ask_buffer[ask_find[1:0]] <= '0;
+						end else begin 
+							ask_buffer[ask_find[1:0]][31:0] <= ask_buffer[ask_find[1:0]][31:0] - curr_size;
+						end 
 						State <= S0;
 					end else begin
 						// TODO err case for now do nothing
 						State <= S0;
 					end
-				end else if (current_side = 8'h1) begin // bid
-					tempfind <= find_price(curr_price, bid_buffer);
-					if (tempfind[2] == 1'b1) begin
-						bid_buffer[tempfind[1:0]] <= ((bid_buffer[tempfind[1:0]][31:0] - curr_size) < 32'b0 ? 32'b0 
-						: bid_buffer[tempfind[1:0]][31:0] - curr_size);
+				end
+					else if (curr_side == 8'h1) begin // bid
+						if (bid_find[2] == 1'b1) begin
+							if (curr_size >= bid_buffer[bid_find[1:0]][31:0]) begin
+								bid_buffer[bid_find[1:0]] <= '0;
+							end else begin 
+								bid_buffer[bid_find[1:0]][31:0] <= bid_buffer[bid_find[1:0]][31:0] - curr_size;
+							end
 						State <= S0;
 					end else begin
 						// TODO err case for now do nothing
 						State <= S0;
 					end
-				end else begin 
+					end else begin 
 					// TODO err case for now do nothing
+					State <= S0; 
+					end 
+				
+			end
+			S4: begin //mod
+				if (curr_side == 8'h0) begin // ask
+					if (ask_find[2] == 1'b1) begin
+						ask_buffer[ask_find[1:0]] <= {curr_price, curr_size};
+						State <= S0;
+					end else begin 
+						// TODO 
+						State <= S0;
+					end
+				end else if (curr_side == 8'h1) begin
+					if(bid_find[2] == 1'b1) begin
+						bid_buffer[bid_find[1:0]] <= {curr_price, curr_size};
+						State <= S0;
+					end else begin
+						// TODO
+						State <= S0;
+					end
+				end else begin
+					// TODO
 					State <= S0;
 				end
 			end
+			endcase
+			end
+end
 
-		endcase
-	end
 endmodule
-
-					
-
-						
