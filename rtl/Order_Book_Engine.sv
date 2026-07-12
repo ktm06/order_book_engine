@@ -51,7 +51,7 @@ Bid_Comparator Bid_Compare  (
 	.p3(bid_buffer[3][63:32]),
 	.best_bid_num(best_bid_num),
 	.best_bid_price(best_bid_price),
-	.validout(bidready)
+	.valid_best_bid(bidready)
 );
 
 Ask_Comparator Ask_Compare (
@@ -97,13 +97,16 @@ Bid_Comparator Highest_Ask_Finder (
 	.p3(ask_buffer[3][63:32]),
 	.best_bid_num(highestaskpos),
 	.best_bid_price(highest_curr_ask),
-	.validout()
+	.valid_best_bid()
 
 );
 
 always_comb begin  // evaluate spread
 	if (bidready & askready) begin
-		best_spread = best_ask_price - best_bid_price;
+		if (best_ask_price >= best_bid_price)
+			best_spread = best_ask_price - best_bid_price;
+		else
+			best_spread = best_bid_price - best_ask_price;
 	end else begin
 		best_spread = 32'b0;
 	end
@@ -131,7 +134,7 @@ function automatic logic [2:0] find_price(
 	// [2:0] return type. [1:0] will be the position where we found 
 	// the type, and [2] will be 1 if found, 0 if not found
 	for (int i = 0; i < 4; i++) begin
-		if (buffer[i][63:32] == inprice) begin
+		if (buffer[i] != 64'b0 && buffer[i][63:32] == inprice) begin
 			return {1'b1, i[1:0]};
 		end 
 	end
@@ -204,7 +207,10 @@ always_ff @(posedge CLK, posedge RESET) begin
 					if (ask_find[2] == 1'b0) begin // not found so add
 						if (ask_count < 4) begin
 							for (int i = 0; i < 4; i++) begin
-								if (ask_buffer[i] == '0) ask_buffer[i] <= {curr_price, curr_size};
+								if (ask_buffer[i] == 64'b0) begin
+									ask_buffer[i] <= {curr_price, curr_size};
+									break;
+								end
 							end
 						end else begin // drop high with bid comparator
 							if (curr_price < highest_curr_ask) ask_buffer[highestaskpos] <= {curr_price, curr_size};
@@ -217,7 +223,10 @@ always_ff @(posedge CLK, posedge RESET) begin
 					if (bid_find[2] == 1'b0) begin
 						if (bid_count < 4) begin
 							for (int i = 0; i < 4; i++) begin
-								if (bid_buffer[i] == '0) bid_buffer[i] <= {curr_price, curr_size};
+								if (bid_buffer[i] == 64'b0) begin 
+									bid_buffer[i] <= {curr_price, curr_size};
+									break;
+								end
 							end
 							end else begin // drop low with ask comparator
 							if (curr_price > lowest_curr_bid) bid_buffer[lowestbidpos] <= {curr_price, curr_size};
@@ -235,7 +244,7 @@ always_ff @(posedge CLK, posedge RESET) begin
 				if (curr_side == 8'h0) begin //ask
 					if (ask_find[2] == 1'b1) begin
 						if (curr_size >= ask_buffer[ask_find[1:0]][31:0]) begin
-							ask_buffer[ask_find[1:0]] <= '0;
+							ask_buffer[ask_find[1:0]] <= 64'b0;
 						end else begin 
 							ask_buffer[ask_find[1:0]][31:0] <= ask_buffer[ask_find[1:0]][31:0] - curr_size;
 						end 
@@ -248,7 +257,7 @@ always_ff @(posedge CLK, posedge RESET) begin
 					else if (curr_side == 8'h1) begin // bid
 						if (bid_find[2] == 1'b1) begin
 							if (curr_size >= bid_buffer[bid_find[1:0]][31:0]) begin
-								bid_buffer[bid_find[1:0]] <= '0;
+								bid_buffer[bid_find[1:0]] <= 64'b0;
 							end else begin 
 								bid_buffer[bid_find[1:0]][31:0] <= bid_buffer[bid_find[1:0]][31:0] - curr_size;
 							end
