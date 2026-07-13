@@ -18,6 +18,7 @@ module TF_Order_Book_Engine();
     logic [7:0] msgtype;
     logic inready;
     logic [31:0] best_spread;
+    logic outready;
 
     initial begin
         RESET = 1'b1;
@@ -35,6 +36,7 @@ module TF_Order_Book_Engine();
         .msgtype(msgtype),
         .inready(inready),
         .best_spread(best_spread),
+        .outready(outready),
         .CLK(CLK),
         .RESET(RESET)
     );

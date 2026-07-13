@@ -10,6 +10,8 @@ module Order_Book_Engine
 	input [7:0] msgtype,
 	input inready,
 	output logic [31:0] best_spread, 
+	output logic outready,
+	output logic busy,
 	input CLK,
 	input RESET
 );
@@ -125,7 +127,7 @@ typedef enum logic [4:0] {
 	S4 = 5'b10000 //MOD
 } State_t;
 
-
+assign busy = (State != S0); //For TopLevel - do not input when busy
 
 function automatic logic [2:0] find_price(
 	input logic [31:0] inprice,
@@ -178,6 +180,7 @@ always_ff @(posedge CLK, posedge RESET) begin
 		curr_size <= '0;
 		curr_side <= '0;
 		curr_msgtype <= '0;
+		outready <= 1'b0;
 	end else begin
 		case (State)
 			S0: begin
@@ -189,6 +192,7 @@ always_ff @(posedge CLK, posedge RESET) begin
 					State <= S1;
 				end else begin
 					State <= S0;
+				outready <= 1'b0;
 				end
 			end
 			S1: begin
@@ -219,6 +223,7 @@ always_ff @(posedge CLK, posedge RESET) begin
 						ask_buffer[ask_find[1:0]][31:0] <= ask_buffer[ask_find[1:0]][31:0] + curr_size; // we assume we dont approach 4.3 billion shares
 					end
 					State <= S0;
+					outready <= 1'b1;
 				end else if (curr_side == 8'h1) begin // Bid
 					if (bid_find[2] == 1'b0) begin
 						if (bid_count < 4) begin
@@ -235,9 +240,11 @@ always_ff @(posedge CLK, posedge RESET) begin
 						bid_buffer[bid_find[1:0]][31:0] <= bid_buffer[bid_find[1:0]][31:0] + curr_size;
 					end
 					State <= S0;
+					outready <= 1'b1;
 				end else begin 
 					// TODO err case for now do nothing
 					State <= S0;
+					outready <= 1'b1;
 				end
 			end 
 			S3: begin // delete
@@ -249,9 +256,11 @@ always_ff @(posedge CLK, posedge RESET) begin
 							ask_buffer[ask_find[1:0]][31:0] <= ask_buffer[ask_find[1:0]][31:0] - curr_size;
 						end 
 						State <= S0;
+						outready <= 1'b1;
 					end else begin
 						// TODO err case for now do nothing
 						State <= S0;
+						outready <= 1'b1;
 					end
 				end
 					else if (curr_side == 8'h1) begin // bid
@@ -262,13 +271,16 @@ always_ff @(posedge CLK, posedge RESET) begin
 								bid_buffer[bid_find[1:0]][31:0] <= bid_buffer[bid_find[1:0]][31:0] - curr_size;
 							end
 						State <= S0;
+						outready <= 1'b1;
 					end else begin
 						// TODO err case for now do nothing
 						State <= S0;
+						outready <= 1'b1;
 					end
 					end else begin 
 					// TODO err case for now do nothing
-					State <= S0; 
+					State <= S0;
+					outready <= 1'b1; 
 					end 
 				
 			end
@@ -277,21 +289,26 @@ always_ff @(posedge CLK, posedge RESET) begin
 					if (ask_find[2] == 1'b1) begin
 						ask_buffer[ask_find[1:0]] <= {curr_price, curr_size};
 						State <= S0;
+						outready <= 1'b1;
 					end else begin 
 						// TODO 
 						State <= S0;
+						outready <= 1'b1;
 					end
 				end else if (curr_side == 8'h1) begin
 					if(bid_find[2] == 1'b1) begin
 						bid_buffer[bid_find[1:0]] <= {curr_price, curr_size};
 						State <= S0;
+						outready <= 1'b1;
 					end else begin
 						// TODO
 						State <= S0;
+						outready <= 1'b1;
 					end
 				end else begin
 					// TODO
 					State <= S0;
+					outready <= 1'b1;
 				end
 			end
 			endcase

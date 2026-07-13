@@ -24,6 +24,7 @@ module Serial_UART_Transmitter
 	// UART Transmitter Signals
 	input                      TX_SEND,
 	input      [DATA_BITS-1:0] TX_DATA,
+	output reg                 TX_BUSY,
 	output reg                 TX_DONE,
 
 	// UART Bus Signals
@@ -67,83 +68,118 @@ module Serial_UART_Transmitter
 	//
 	// Serial UART Transmitter State Machine
 	//
-
-	// !! Lab 5: Add the Serial UART Transmitter State Machine here !!
-	
 	reg [5:0] State;
 	localparam [5:0]
-	S0 = 6'b000001,
-	S1 = 6'b000010,
-	S2 = 6'b000100,
-	S3 = 6'b001000,
-	S4 = 6'b010000,
-	S5 = 6'b100000;
+		S0 = 6'b000001,
+		S1 = 6'b000010,
+		S2 = 6'b000100,
+		S3 = 6'b001000,
+		S4 = 6'b010000,
+		S5 = 6'b100000;
+	
 	
 	always @(posedge CLK, posedge RESET)
 	begin
+	
 		if (RESET)
-			begin
-			State <= S0;
-			TX_DONE <= 1'b0;
-			UART_TX <= 1'b1;
+		begin
+
 			tx_frame_data_reg <= {FRAME_WIDTH{1'b0}};
 			tx_bit_counter <= BIT_COUNT_LOADVAL;
-			end
-		else begin
+		
+			UART_TX <= 1'b1;
+			
+			TX_DONE <= 1'b0;
+			
+			State <= S0;
+			
+		end
+		else
+		begin
+		
 			case (State)
-				S0:
+			
+				S0 :
+				begin
+
+					// Clear the Done signal
+					TX_DONE <= 1'b0;
+					
+					// Wait for the Send command
+					if (TX_SEND)
 					begin
-						TX_DONE <=1'b0;
+						TX_BUSY <= 1'b1;
+						State <= S1;
+					end
+					else
+						TX_BUSY <= 1'b0;
+					
+				end
+				
+				S1 :
+				begin
+				
+					// Load the transmit frame data register
+					tx_frame_data_reg <= { TX_DATA, {START_BITS{1'b0}} };
+				
+					// Set the bit counter to transmit the data bits plus the stop bit(s)
+					tx_bit_counter <= BIT_COUNT_LOADVAL;
+					
+					State <= S2;
+					
+				end
+				
+				S2 :
+				begin
+				
+					// Wait for the next baud tick
+					if (BAUD_TICK)
+						State <= S3;
+				
+				end
+				
+				S3 :
+				begin
+				
+					// Transmit the next data bit (LSB first)
+					UART_TX <= tx_frame_data_reg[0];
+					
+					// Check if bit counter done yet
+					if (tx_bit_counter_done)
+						State <= S5;
+					else
+						State <= S4;
 						
-						if (TX_SEND)
-							begin
-								State <= S1;
-							end
-						else begin
-							State <= S0;
-						end
-					end
-				S1: 
-					begin 
-						tx_frame_data_reg <= {TX_DATA, {START_BITS{1'b0}} };
-						State <= S2;
-						
-					end
-				S2:
-					begin
-						if (BAUD_TICK)
-							begin
-								State <= S3;
-							end
-						else begin
-							State <= S2;
-						end
-					end
-				S3: 
-					begin
-	
-						UART_TX <= tx_frame_data_reg[0];
-							if (tx_bit_counter_done)
-								begin
-									State <= S5;
-								end
-							else begin
-								State <= S4;
-							end
-					end
-				S4:
-					begin
-						tx_frame_data_reg <= {1'b1, tx_frame_data_reg[FRAME_WIDTH-1:1] };
-						State <= S2;
-					end
-				S5:
-					begin
-						TX_DONE <=1'b1;
-						State <=S0;
-					end
-				endcase
-end
-end
-	
+				end
+				
+				S4 :
+				begin
+				
+					// Shift the data register for the next transmit bit
+					//   NOTE: 1'b1 is shifted in here for the STOP bit(s)
+					tx_frame_data_reg <= { 1'b1, tx_frame_data_reg[FRAME_WIDTH-1:1] };
+				
+					// Increment the bit counter
+					tx_bit_counter <= tx_bit_counter + 1'b1;
+					
+					State <= S2;
+				
+				end
+				
+				S5 :
+				begin
+				
+					// Set Done Status
+					TX_DONE <= 1'b1;
+					
+					State <= S0;
+				
+				end
+				
+			endcase
+		
+		end
+		
+	end
 	
 endmodule
