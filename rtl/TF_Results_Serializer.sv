@@ -56,11 +56,14 @@ module TF_Results_Serializer();
         .spread_in(spread_in),
         .inready(inready),
         .TX_DATA(TX_DATA),
+        .TX_BUSY(TX_BUSY),
         .TX_SEND(TX_SEND),
         .TX_DONE(TX_DONE),
         .CLK(CLK),
         .RESET(RESET)
     );
+
+    
     // UART output monitor
     initial begin
         forever begin
@@ -84,12 +87,12 @@ module TF_Results_Serializer();
         #500;
 
         @(posedge CLK);
-        spread_in = 32'hAAAAAAAA;
+        spread_in = 32'hABCDEFBA;
         inready = 1'b1;
         @(posedge CLK);
         inready = 1'b0;
         #400000;
-        $display("%t, should be AA AA AA AA", $time);
+        $display("%t, should be AB CD EF BA", $time);
 
         @(posedge CLK);
         spread_in = 32'h00000005;
