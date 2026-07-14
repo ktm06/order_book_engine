@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 
-module Result_Serializer (
+module Result_Serializer #(
+    parameter CLK_RATE_HZ = 50000000
+) (
     input [31:0] spread_in,
     input inready,
     output logic [7:0] TX_DATA,
