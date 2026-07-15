@@ -27,6 +27,7 @@ logic [31:0] size;
 logic msgdecoded;
 logic [31:0] best_spread;
 logic outready;
+logic orderbookbusy;
 
 logic RESET;
 assign RESET = ~RESET_N;
@@ -67,7 +68,7 @@ MessageParser
 ) parser (
 	.byteready(RX_READY),
 	.inbits(RX_DATA),
-	.message_ready(messageready),
+	.messageready(messageready),
 	.parsed_message(parsed_message),
 	.CLK(CLK),
 	.RESET(RESET)
@@ -79,8 +80,9 @@ Message_Decoder
 	.DATA_BITS(DATA_BITS),
 	.MESSAGE_LENGTH(MESSAGE_LENGTH)
 ) decoder (
-	.inbits(RX_DATA),
-	.messageready(messageready),
+	.inbits(parsed_message),
+
+	.message_ready(messageready),
 	.msgtype(msgtype),
 	.price(price),
 	.side(side),
@@ -101,7 +103,7 @@ Order_Book_Engine #(
     .inready(msgdecoded),
     .best_spread(best_spread),
     .outready(outready),
-    .busy(),
+    .busy(orderbookbusy),
     .CLK(CLK),
     .RESET(RESET)
 );

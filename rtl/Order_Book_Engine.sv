@@ -127,7 +127,7 @@ typedef enum logic [4:0] {
 	S4 = 5'b10000 //MOD
 } State_t;
 
-assign busy = (State != S0); //For TopLevel - do not input when busy
+
 
 function automatic logic [2:0] find_price(
 	input logic [31:0] inprice,
@@ -168,7 +168,7 @@ assign bid_count = find_total_valids(bid_buffer);
 
 State_t State;
 
-
+assign busy = (State != S0); //For TopLevel - do not input when busy
 always_ff @(posedge CLK, posedge RESET) begin
 	if (RESET) begin
 		for (int i = 0; i < 4; i++) begin
