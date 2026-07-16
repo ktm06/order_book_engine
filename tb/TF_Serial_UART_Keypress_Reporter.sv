@@ -82,7 +82,7 @@ module TF_Serial_UART_Keypress_Reporter();
 	//
 	initial
 	begin
-		
+		W
 		// Initialize Signals
 		TX_SEND = 1'b0;
 		TX_DATA = 8'h00;
