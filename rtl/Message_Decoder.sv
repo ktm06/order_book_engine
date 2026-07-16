@@ -19,7 +19,8 @@ module Message_Decoder
 );
 
 
-
+// FORMAT: inbits[79:72]  is message type, [71:64] is side (ASK or BID), price is [63:32], and size is [31:0]
+ 
 always_ff @(posedge CLK) begin
 	if (RESET) begin
 		size <= '0;
