@@ -8,8 +8,7 @@
 #include <optional>
 
 const int MSG_LENGTH = 10;
-const char* PORT_NAME = "placeholder";
-const int BAUD_RATE = 115200 ;
+const char* PORT_NAME = "\\\\.\\COM3";;
 
 typedef uint8_t mt_t;
 typedef uint8_t side_t;
@@ -42,8 +41,8 @@ std::optional<uint8_t> convert_instr(
 }
 
 msg create_msg(
-    std::string messagetype,
-    std::string side,
+    const char* messagetype,
+    const char* side,
     price_t price,
     orsize_t size
 ) {
@@ -91,12 +90,82 @@ void serialize(
     }
 }
 
-void send_uart(HANDLE h, const msg& message) {
-    DWORD written;
-    if (!WriteFile(h, message.data(), message.size(), &written, NULL)
-    || written != message.size()) {
-        fprintf(stderr, "UART write failed (%lu/%zu bytes)\n", written, message.size());
-        exit(1);
+bool send_uart(HANDLE h, const msg& message) {
+    DWORD written = 0;
+
+    BOOL uart_write = WriteFile(
+        h,
+        message.data(),
+        message.size(),
+        &written,
+        NULL
+    );
+
+    if (!uart_write) {
+        fprintf(stderr, "FAIL: fail uart write. windows error %lu\n", GetLastError());
+
+        return false;
+    }
+
+    if (written != message.size()) {
+        fprintf(stderr, "FAIL: uart incomplete write %lu/%zu bytes\n", written, message.size());
+        return false;
+    }
+
+    return true;
+}
+
+std::optional<uint32_t> read_spread(HANDLE h) {
+    uint8_t buf[4] = {};
+    DWORD received = 0;
+
+    // ensure size match1
+    if (!ReadFile(h, buf, 4, &received, NULL)) {
+        fprintf(stderr, "FAIL: readfile fail error, windows error: %lu", GetLastError());
+        return std::nullopt;
+    }
+    if (received != 4){
+        fprintf(stderr, "FAIL: reply timeout, %lu/4 bytes\n", received);
+        return std::nullopt;
+    }
+
+    // into one
+    return ((uint32_t)buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | (buf[3]);
+}
+
+
+void ut(
+    HANDLE h,
+    const char* messagetype,
+    const char* side,
+    price_t price,
+    orsize_t size,
+    uint32_t expected
+) {
+    msg message = create_msg(messagetype, side, price, size);
+
+    if (!send_uart(h, message)) {
+        printf("FAIL: could not send mt=%s, side=%s, price=%u, size=%u\n",
+               messagetype, side, price, size);
+        return;
+    }
+
+    auto response = read_spread(h);
+
+    if (!response) {
+        printf("FAIL: no response for mt=%s, side=%s, price=%u, size=%u\n",
+               messagetype, side, price, size);
+        return;
+    }
+
+    uint32_t actual = *response;
+
+    if (actual == expected) {
+        printf("PASS: mt=%s, side=%s, price=%u, size=%u, spread=%u\n",
+               messagetype, side, price, size, actual);
+    } else {
+        printf("FAIL: mt=%s, side=%s, price=%u, size=%u, expected=%u, actual=%u\n",
+               messagetype, side, price, size, expected, actual);
     }
 }
 
@@ -104,7 +173,7 @@ int main() {
 
     HANDLE hSerial;
     
-    hSerial = CreateFile(PORT_NAME,
+    hSerial = CreateFileA(PORT_NAME,
                         GENERIC_READ | GENERIC_WRITE,
                         0,
                         0,
@@ -134,14 +203,38 @@ int main() {
     dcbSerialParams.StopBits = ONESTOPBIT;
     dcbSerialParams.Parity = NOPARITY;
 
-    if (!SetCommState(hSerial, &dcbSerialParams)) {
-        fprintf(stderr, "Error setting serial port state\n");
+   COMMTIMEOUTS timeouts = {};
+    timeouts.ReadIntervalTimeout = 50;
+    timeouts.ReadTotalTimeoutConstant = 1000;
+    timeouts.ReadTotalTimeoutMultiplier = 0;
+    timeouts.WriteTotalTimeoutConstant = 1000;
+    timeouts.WriteTotalTimeoutMultiplier = 0;
+
+    if (!SetCommTimeouts(hSerial, &timeouts)) {
+        fprintf(stderr, "Error setting timeouts: %lu\n", GetLastError());
         CloseHandle(hSerial);
         return 1;
     }
 
-    send_uart(hSerial, create_msg("ADD", "ASK", 50, 10));
+    PurgeComm(hSerial, PURGE_RXCLEAR | PURGE_TXCLEAR);
 
+    ut(hSerial, "ADD", "ASK", 50, 10, 0);
+    ut(hSerial, "ADD", "ASK", 55, 10, 0);
+    ut(hSerial, "ADD", "ASK", 60, 10, 0);
+    ut(hSerial, "ADD", "BID", 40, 10, 10);
+    ut(hSerial, "ADD", "BID", 45, 10, 5);
+    ut(hSerial, "ADD", "BID", 45, 20, 5);
+    ut(hSerial, "DEL", "BID", 45, 30, 10);
+    ut(hSerial, "DEL", "ASK", 50, 10, 15);
+    ut(hSerial, "MOD", "ASK", 55, 99, 15);
+    ut(hSerial, "DEL", "ASK", 12345, 5, 15);
+    ut(hSerial, "ADD", "BID", 41, 10, 15);
+    ut(hSerial, "ADD", "BID", 42, 10, 14);
+    ut(hSerial, "ADD", "BID", 43, 10, 13);
+    ut(hSerial, "ADD", "BID", 44, 10, 12);
+    ut(hSerial, "ADD", "BID", 1, 10, 12);
+
+    printf("Finished");
     CloseHandle(hSerial);
 
     return 0;
