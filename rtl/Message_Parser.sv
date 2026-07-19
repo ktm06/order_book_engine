@@ -33,12 +33,12 @@ always_ff @(posedge CLK or posedge RESET) begin
 		output_reg <= '0;
 		messageready <= 1'b0;
 	end else if (byteready) begin
-		if (idle_count[15]) begin // long silence: this byte MUST be byte 0 of a new message
+		if (idle_count[15]) begin /
 			output_reg <= {{(MESSAGE_LENGTH*DATA_BITS-8){1'b0}}, inbits};
 			count <= 4'd1;
 			messageready <= 1'b0;
 		end else if (count < MESSAGE_LENGTH) begin
-			output_reg <= {output_reg[MESSAGE_LENGTH*DATA_BITS -9:0], inbits}; // concat to shift
+			output_reg <= {output_reg[MESSAGE_LENGTH*DATA_BITS -9:0], inbits}; 
 			messageready <= 1'b0;
 			if (count == MESSAGE_LENGTH-1) begin
 				messageready <= 1'b1;

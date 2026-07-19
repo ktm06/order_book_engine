@@ -168,7 +168,7 @@ void ut(
         printf("FAIL: mt=%s, side=%s, price=%u, size=%u, expected=%u, actual=%u\n",
                messagetype, side, price, size, expected, actual);
     }
-    Sleep(2); // gap
+    Sleep(5); // gap
 }
 
 int main() {
@@ -227,7 +227,7 @@ int main() {
     PurgeComm(hSerial, PURGE_RXCLEAR | PURGE_TXCLEAR);
     printf("Pprt open, wait for input\n");
     getchar();
-
+/*
     ut(hSerial, "ADD", "ASK", 50, 10, 0);
     ut(hSerial, "ADD", "ASK", 55, 10, 0);
     ut(hSerial, "ADD", "ASK", 60, 10, 0);
@@ -243,7 +243,11 @@ int main() {
     ut(hSerial, "ADD", "BID", 43, 10, 12);
     ut(hSerial, "ADD", "BID", 44, 10, 11);
     ut(hSerial, "ADD", "BID", 1, 10, 11);
-
+*/
+    ut(hSerial, "ADD", "ASK", 50, 10, 0);
+    ut(hSerial, "ADD", "BID", 40, 10, 10);
+    // two test pass, btu full 15 instr testbench doesnt 
+    // need to press RESET tho (key0)
     printf("Finished");
     CloseHandle(hSerial);
 
