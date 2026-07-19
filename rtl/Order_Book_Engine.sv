@@ -311,6 +311,7 @@ always_ff @(posedge CLK, posedge RESET) begin
 					outready <= 1'b1;
 				end
 			end
+			default: State <= S0;
 			endcase
 			end
 end

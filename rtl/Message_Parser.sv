@@ -15,10 +15,17 @@ module MessageParser
 	input RESET
 );
 
-// COUNTER
+
 logic [3:0] count;
 
 logic [MESSAGE_LENGTH * DATA_BITS -1:0] output_reg;
+
+logic [15:0] idle_count;
+always_ff @(posedge CLK or posedge RESET) begin
+	if (RESET) idle_count <= '0;
+	else if (byteready) idle_count <= '0;
+	else if (!idle_count[15]) idle_count <= idle_count + 1'b1;
+end
 
 always_ff @(posedge CLK or posedge RESET) begin
 	if (RESET) begin
@@ -26,7 +33,11 @@ always_ff @(posedge CLK or posedge RESET) begin
 		output_reg <= '0;
 		messageready <= 1'b0;
 	end else if (byteready) begin
-		if (count < MESSAGE_LENGTH) begin
+		if (idle_count[15]) begin // long silence: this byte MUST be byte 0 of a new message
+			output_reg <= {{(MESSAGE_LENGTH*DATA_BITS-8){1'b0}}, inbits};
+			count <= 4'd1;
+			messageready <= 1'b0;
+		end else if (count < MESSAGE_LENGTH) begin
 			output_reg <= {output_reg[MESSAGE_LENGTH*DATA_BITS -9:0], inbits}; // concat to shift
 			messageready <= 1'b0;
 			if (count == MESSAGE_LENGTH-1) begin
@@ -47,5 +58,3 @@ always_ff @(posedge CLK) begin
 end
 
 endmodule
-
-

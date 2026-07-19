@@ -126,9 +126,10 @@ std::optional<uint32_t> read_spread(HANDLE h) {
     }
     if (received != 4){
         fprintf(stderr, "FAIL: reply timeout, %lu/4 bytes\n", received);
+        PurgeComm(h, PURGE_RXCLEAR);
         return std::nullopt;
     }
-
+   
     // into one
     return ((uint32_t)buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | (buf[3]);
 }
@@ -167,6 +168,7 @@ void ut(
         printf("FAIL: mt=%s, side=%s, price=%u, size=%u, expected=%u, actual=%u\n",
                messagetype, side, price, size, expected, actual);
     }
+    Sleep(2); // gap
 }
 
 int main() {
@@ -202,6 +204,12 @@ int main() {
     dcbSerialParams.ByteSize=8;
     dcbSerialParams.StopBits = ONESTOPBIT;
     dcbSerialParams.Parity = NOPARITY;
+    if (!SetCommState(hSerial, &dcbSerialParams)) {
+        fprintf(stderr, "Error setting state\n");
+        CloseHandle(hSerial);
+        return 1;
+    }
+
 
    COMMTIMEOUTS timeouts = {};
     timeouts.ReadIntervalTimeout = 50;
@@ -217,6 +225,8 @@ int main() {
     }
 
     PurgeComm(hSerial, PURGE_RXCLEAR | PURGE_TXCLEAR);
+    printf("Pprt open, wait for input\n");
+    getchar();
 
     ut(hSerial, "ADD", "ASK", 50, 10, 0);
     ut(hSerial, "ADD", "ASK", 55, 10, 0);
@@ -228,11 +238,11 @@ int main() {
     ut(hSerial, "DEL", "ASK", 50, 10, 15);
     ut(hSerial, "MOD", "ASK", 55, 99, 15);
     ut(hSerial, "DEL", "ASK", 12345, 5, 15);
-    ut(hSerial, "ADD", "BID", 41, 10, 15);
-    ut(hSerial, "ADD", "BID", 42, 10, 14);
-    ut(hSerial, "ADD", "BID", 43, 10, 13);
-    ut(hSerial, "ADD", "BID", 44, 10, 12);
-    ut(hSerial, "ADD", "BID", 1, 10, 12);
+    ut(hSerial, "ADD", "BID", 41, 10, 14);
+    ut(hSerial, "ADD", "BID", 42, 10, 13);
+    ut(hSerial, "ADD", "BID", 43, 10, 12);
+    ut(hSerial, "ADD", "BID", 44, 10, 11);
+    ut(hSerial, "ADD", "BID", 1, 10, 11);
 
     printf("Finished");
     CloseHandle(hSerial);

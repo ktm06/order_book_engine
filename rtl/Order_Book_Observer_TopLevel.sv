@@ -9,7 +9,8 @@ module Order_Book_Observer_TopLevel #(
     input CLK,
     input RESET_N,
     input UART_RX,
-    output UART_TX
+    output UART_TX,
+	output [9:0] LEDR
 );
 
 logic RX_READY;
@@ -31,6 +32,25 @@ logic orderbookbusy;
 
 logic RESET;
 assign RESET = ~RESET_N;
+
+// debug LED logic on FPGA
+logic rx_debug, msg_debug, dec_debug, out_debug;
+always_ff @(posedge CLK, posedge RESET) begin
+    if (RESET) begin
+        rx_debug <= 0; 
+		msg_debug <= 0; 
+		dec_debug <= 0; 
+		out_debug <= 0;
+    end else begin
+        if (RX_READY) rx_debug <= 1;
+        if (messageready) msg_debug <= 1;
+        if (msgdecoded) dec_debug <= 1;
+        if (outready) out_debug <= 1;
+    end
+end
+assign LEDR = {msgtype, out_debug, rx_debug};
+
+
 
 Serial_UART_Transceiver
 #(
@@ -119,6 +139,8 @@ Result_Serializer #(
     .CLK(CLK),
     .RESET(RESET)
 );
+
+
 
 endmodule
 
