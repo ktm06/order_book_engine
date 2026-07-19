@@ -4,7 +4,7 @@ This is a order book observer written in SystemVerilog, which takes in a live ma
 
 More specifically, we have a L2 Order Book Engine inside the FPGA, where we store memory of all Asks and Bids, and continuously track the best spread. We add orders to this FPGA through a C++ program running on Windows through UART, and the same script receives best spread. 
 
-**SV File Structure**
+**SV File Structure:**
 
 ```
 \ rtl
