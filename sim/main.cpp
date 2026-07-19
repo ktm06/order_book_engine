@@ -224,10 +224,15 @@ int main() {
         return 1;
     }
 
+    printf("port open\n");
+        send_uart(hSerial, create_msg("DEL", "ASK", 999999, 1));
+    uint8_t drainbuf[64]; DWORD got;
+    do {
+        ReadFile(hSerial, drainbuf, sizeof(drainbuf), &got, NULL);   // 1s timeout per your COMMTIMEOUTS
+    } while (got > 0);
+    printf("now press key0 to reset\n");
+    while (getchar() != '\n');
     PurgeComm(hSerial, PURGE_RXCLEAR | PURGE_TXCLEAR);
-    printf("Pprt open, wait for input\n");
-    getchar();
-/*
     ut(hSerial, "ADD", "ASK", 50, 10, 0);
     ut(hSerial, "ADD", "ASK", 55, 10, 0);
     ut(hSerial, "ADD", "ASK", 60, 10, 0);
@@ -243,13 +248,18 @@ int main() {
     ut(hSerial, "ADD", "BID", 43, 10, 12);
     ut(hSerial, "ADD", "BID", 44, 10, 11);
     ut(hSerial, "ADD", "BID", 1, 10, 11);
-*/
-    ut(hSerial, "ADD", "ASK", 50, 10, 0);
-    ut(hSerial, "ADD", "BID", 40, 10, 10);
+
+    //ut(hSerial, "ADD", "ASK", 50, 10, 0);
+    //ut(hSerial, "ADD", "BID", 40, 10, 10);
     // two test pass, btu full 15 instr testbench doesnt 
     // need to press RESET tho (key0)
+    Sleep(100); 
+    FlushFileBuffers(hSerial);
+    CloseHandle(hSerial);
+                                            
     printf("Finished");
     CloseHandle(hSerial);
+    
 
     return 0;
 }

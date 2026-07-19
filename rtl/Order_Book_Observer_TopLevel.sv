@@ -54,7 +54,7 @@ assign LEDR = {msgtype, out_debug, rx_debug};
 
 Serial_UART_Transceiver
 #(
-    .CLK_RATE_HZ(CLK_RATE_HZ), // Hz
+    .CLK_RATE_HZ(CLK_RATE_HZ), // HzCD
 	.BAUD_RATE(BAUD_RATE), // Baud (bits/s)
 	.DATA_BITS(8),
 	.STOP_BITS_TX(1),
