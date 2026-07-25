@@ -32,18 +32,56 @@ typedef enum logic [3:0] {
 State_t State;
 
 always_ff @(posedge CLK, posedge RESET) begin
-    if (reset) begin
-        State <= '0;
+    if (RESET) begin
+        State <= IDLE;
         samp_count <= '0;
-
         rx_data <= 'b0;
         rx_ready <= 1'b0;
+        bit_count <= '0;
+        rx_shift <= '0;
     end else begin
-        case (State)
+        rx_ready <=1'b0;
+        if (baud_pulse) begin
+            if (samp_count != 4'b0) begin // decrement
+            samp_count <= samp_count - 1'b1;
+            end
+            case (State)
+                IDLE: begin
+                    if (~uart_rx) begin
+                        samp_count <= HALF_BIT - 1;
+                        State <= START;
+                    end
+                end
+                START: begin
+                    if (samp_at_center) begin
+                        if (~uart_rx) begin
+                        samp_count <= TICKS_PER_BIT - 1;
+                        bit_count <= '0;
+                        State <= DATA;
+                        end else begin
+                            State <= IDLE;
+                        end
+                    end
+                end
+                DATA: begin
+                    if (samp_at_center) begin
+                        rx_shift <= {uart_rx, rx_shift[DATA_BITS-1:1]};
+                        samp_count <= TICKS_PER_BIT - 1;
+                        if (bit_count == DATA_BITS-1) State <= STOP;
+                        else bit_count <= bit_count + 1'b1;
+                    end
+                    end
+                STOP:
+                    if (samp_at_center) begin
+                        if (uart_rx) begin
+                            rx_data <= rx_shift;
+                            rx_ready <= 1'b1;
+                        end
+                        State <= IDLE;
+                    end
+                default: State <= IDLE;
 
-
-
-        endcase
+            endcase
 
     end
 end
