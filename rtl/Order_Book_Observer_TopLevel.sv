@@ -57,8 +57,7 @@ Serial_UART_Transceiver
     .CLK_RATE_HZ(CLK_RATE_HZ), // HzCD
 	.BAUD_RATE(BAUD_RATE), // Baud (bits/s)
 	.DATA_BITS(8),
-	.STOP_BITS_TX(1),
-	.STOP_BITS_RX(1)
+	.OVERSAMPLE (16)
 ) transceiver (
 	// UART Bus Signals
 	.UART_RX(UART_RX),

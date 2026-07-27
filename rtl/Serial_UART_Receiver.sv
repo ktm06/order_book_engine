@@ -1,158 +1,90 @@
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: Case Western Reserve University
-// Engineer: Matt McConnell
-// 
-// Create Date:    12:36:00 02/18/2017 
-// Project Name:   EECS301 Digital Design
-// Design Name:    Serial UART Project
-// Module Name:    Serial_UART_Receiver
-// Target Devices: Altera Cyclone V
-// Tool versions:  Quartus v15.0
-// Description:    Serial UART Receiver Module
-//                 
-// Dependencies:   
-//
-//////////////////////////////////////////////////////////////////////////////////
+module Serial_UART_Receiver #(
+    parameter DATA_BITS = 8, // should be 8
+    parameter TICKS_PER_BIT = 16 // oversample
+) (
+    input logic uart_rx,
+    output logic [DATA_BITS - 1:0] rx_data,
+    output logic rx_ready,
 
-module Serial_UART_Receiver
-#(
-	parameter DATA_BITS = 8,
-	parameter STOP_BITS = 1
-)
-(
-	// UART Receiver Signals
-	output reg                 RX_READY,
-	output reg [DATA_BITS-1:0] RX_DATA,
+    input logic baud_pulse,
+    input logic CLK,
+    input logic RESET
 
-	// UART Bus Signals
-	input UART_RX,
-
-	// Baud Clock Signals
-	input BAUD_TICK,
-
-	// System Signals
-	input CLK,
-	input RESET
 );
 
-	// Include Standard Functions header file (needed for bit_index())
-	`include "StdFunctions.vh"
+localparam HALF_BIT = TICKS_PER_BIT / 2;
 
-	
-	//
-	// Compute Bit Count Register Size
-	//
-	localparam BIT_COUNT_WIDTH = bit_index(DATA_BITS);
-	localparam [BIT_COUNT_WIDTH:0] BIT_COUNT_LOADVAL = {1'b1, {BIT_COUNT_WIDTH{1'b0}}} - DATA_BITS[BIT_COUNT_WIDTH:0];
+logic [3:0] samp_count;
+logic [3:0] bit_count;
+logic [DATA_BITS-1:0] rx_shift;
 
-	reg [BIT_COUNT_WIDTH:0] bit_count_reg;
-	wire                    bit_count_done = bit_count_reg[BIT_COUNT_WIDTH];
-	
-	
-	//
-	// Receiver Sample Counter
-	//
-	localparam SAMP_COUNT = 4;  // Power-of-2 factor, matching Baud Tick Rate Oversample (2^4=16)
-	localparam [SAMP_COUNT-1:0] SAMP_COUNT_LOADVAL = {1'b1,{SAMP_COUNT-1{1'b0}}} + 2'h2; // Reset to half-count (adjusted for rollover)
-	
-	reg                  samp_count_reset;
-	reg [SAMP_COUNT-1:0] samp_count_reg;
-	reg                  samp_at_center;
-	
-	initial
-	begin
-		samp_count_reg <= SAMP_COUNT_LOADVAL;
-		samp_at_center <= 1'b0;
-	end
-	
-	// Sample Count Register
-	always @(posedge CLK)
-	begin
-		if (samp_count_reset)
-			samp_count_reg <= SAMP_COUNT_LOADVAL;
-		else if (BAUD_TICK)
-			samp_count_reg <= samp_count_reg + 1'b1;
-	end
-	
-	// Sample At Bit Center Point Status Register
-	always @(posedge CLK)
-	begin
-		samp_at_center <= (samp_count_reg == {SAMP_COUNT{1'b0}}) ? 1'b1 : 1'b0;
-	end
-	
-	
-	//
-	// UART Receiver State Machine
-	//
-	reg  [DATA_BITS-1:0] rx_data_reg;
+logic samp_at_center;
 
-	// !! Lab 6: Implement the Serial UART Receiver State Machine here !!
-	reg [4:0] State;
-	localparam [4:0]
-	S0 = 5'b00001,
-	S1 = 5'b00010,
-	S2 = 5'b00100,
-	S3 = 5'b01000,
-	S4 = 5'b10000;
+assign samp_at_center = (samp_count == 4'b0);
 
-	always @(posedge CLK, posedge RESET) begin
-		if (RESET) begin
-			State <= S0;
-			RX_READY <= 1'b0;
-			RX_DATA <= {DATA_BITS{1'b0}};
-			rx_data_reg <= {DATA_BITS{1'b0}};
-			bit_count_reg <= BIT_COUNT_LOADVAL;
-			samp_count_reset <= 1'b1;
-		end else begin
-			case (State)
-				S0: begin
-					RX_READY <= 1'b0;
-					samp_count_reset <= 1'b1;
-					bit_count_reg <= BIT_COUNT_LOADVAL;
-					if (BAUD_TICK & ~UART_RX) begin
-						State <= S1;
-					end else begin
-						State <= S0;
-					end
-				end
-				S1: begin
-					samp_count_reset <= 1'b0;
-					if (BAUD_TICK & samp_at_center) begin
-						if (~UART_RX) begin
-							State <= S2;
-						end else begin
-							State <= S0;
-						end
-					end else begin
-						State <= S1;
-					end
-				end
-				S2: begin
-					if (BAUD_TICK & samp_at_center) begin
-						if (bit_count_done) begin
-							State <= S4;
-						end else begin
-							State <= S3;
-						end
-					end else begin
-						State <= S2;
-					end
-				end
-				S3: begin
-					bit_count_reg <= bit_count_reg + 1'b1;
-					rx_data_reg <= {UART_RX, rx_data_reg[DATA_BITS-1:1]};
-					State <=S2;
-				end
-				S4: begin
-					if (UART_RX) begin
-						RX_DATA <= rx_data_reg;
-						RX_READY <= 1'b1;
-					end
-					State <= S0;
-				end
-				default: State <= S0;
-			endcase
-		end
-	end
+typedef enum logic [3:0] {
+    IDLE = 4'b0001,
+    START = 4'b0010,
+    DATA = 4'b0100,
+    STOP = 4'b1000
+} State_t;
+
+State_t State;
+
+always_ff @(posedge CLK, posedge RESET) begin
+    if (RESET) begin
+        State <= IDLE;
+        samp_count <= '0;
+        rx_data <= 'b0;
+        rx_ready <= 1'b0;
+        bit_count <= '0;
+        rx_shift <= '0;
+    end else begin
+        rx_ready <=1'b0;
+        if (baud_pulse) begin
+            if (samp_count != 4'b0) begin // decrement
+            samp_count <= samp_count - 1'b1;
+            end
+            case (State)
+                IDLE: begin
+                    if (~uart_rx) begin
+                        samp_count <= HALF_BIT - 1;
+                        State <= START;
+                    end
+                end
+                START: begin
+                    if (samp_at_center) begin
+                        if (~uart_rx) begin
+                        samp_count <= TICKS_PER_BIT - 1;
+                        bit_count <= '0;
+                        State <= DATA;
+                        end else begin
+                            State <= IDLE;
+                        end
+                    end
+                end
+                DATA: begin
+                    if (samp_at_center) begin
+                        rx_shift <= {uart_rx, rx_shift[DATA_BITS-1:1]};
+                        samp_count <= TICKS_PER_BIT - 1;
+                        if (bit_count == DATA_BITS-1) State <= STOP;
+                        else bit_count <= bit_count + 1'b1;
+                    end
+                    end
+                STOP:
+                    if (samp_at_center) begin
+                        if (uart_rx) begin
+                            rx_data <= rx_shift;
+                            rx_ready <= 1'b1;
+                        end
+                        State <= IDLE;
+                    end
+                default: State <= IDLE;
+
+            endcase
+
+    end
+end
+end
+
 endmodule
