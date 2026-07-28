@@ -34,6 +34,7 @@ And two sides:
 
 **BID**(```00000001```): Highest price seller is willing to buy for.
 
+The diagram below gives the architecture:
 
 # SV File Structure:
 
