@@ -20,10 +20,10 @@ module Serial_UART_Transceiver #(
 logic uart_rx_sync;
 
 CDC_Input_Synchronizer #(
-	.SYNC_REG_LEN( 2 ) 
+	.SYNC_REG_LENGTH( 2 ) 
 ) uart_rx_synchronizer (
-    .ASYNC_IN( UART_RX ),
-    .SYNC_OUT( uart_rx_sync ),
+    .async_in( UART_RX ),
+    .sync_out( uart_rx_sync ),
     .CLK( CLK ) 
 );
 

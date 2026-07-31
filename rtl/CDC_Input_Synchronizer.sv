@@ -3,8 +3,7 @@ module CDC_Input_Synchronizer #(
 ) (
     input logic async_in,
     output logic sync_out,
-    input CLK,
-    input RESET
+    input CLK
 );
 
 // quartus setup/time hold override
