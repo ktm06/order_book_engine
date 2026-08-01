@@ -44,12 +44,16 @@ Files used for RTL are accordingly placed in the ```rtl``` folder:
 \ rtl
   \ Ask_Comparator.sv  # combinational module to get the lowest Ask price in memory
   \ Bid_Comparator.sv  # combinational module to get highest Bid price in memory
-  \ CDC_Input_Synchronizer.sv  # prevents metastability in UART RX
+  \ CDC_Input_Synchronizer.sv  # clock domain crossing with 2-FF method, to prevent metastability in UART RX
   \ Message_Decoder.sv  # decoded reconstructed message to get ordertype, side, price, and size
   \ Message_Parser.sv  # reconstructs UART RX into message format
   \ Order_Book_Engine.sv # 5-state FSM that maintains Ask and Bid memory and returns best spread
   \ Order_Book_Observer_TopLevel.sv # TopLevel of entire architecture
-  \ Result_Serializer  # Serializing best_spread for UART TX 
+  \ Result_Serializer.sv  # Serializing best_spread for UART TX
+  \ Serial_UART_Baud_Generator.sv # baud generator via integer clock division
+  \ Serial_UART_Receiver.sv # UART RX
+  \ Serial_UART_Transceiver.sv # TopLevel for UART modules
+  \ Serial_UART_Transmitter.sv # UART TX
 ```
 
 For each of the unique modules, we also have a custom testbench, in ```tb``` folder. Each one was accurate and confirmed its respective module.
