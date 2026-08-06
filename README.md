@@ -8,7 +8,9 @@ More specifically, we have a L2 Order Book Engine inside the FPGA, where we stor
 
 1. [The Hardware](#The-hardware)
 2. [Architecture](#Architecture)
+   
     a. [ISA](#ISA)
+
 3. [SV File Structure](#Sv-file-structure)
 4. [Software Interface](#Software-interface)
 5. [Requirements](#Requirements)
