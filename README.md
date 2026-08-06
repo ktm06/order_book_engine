@@ -35,7 +35,7 @@ We have three instr types:
 
 **DEL**(```00000010```): Delete some order @ {price} of {size}. Subtract from existing pricepoint the {size}. If reduced size is 0 or less, reset that memory element (aka set it to 32'b0). NEVER go below 0.
 
-**MOD**(```00000011```):: Modify size corresponding to {price} to {size}. If {price} is not stored, do nothing.
+**MOD**(```00000011```): Modify size corresponding to {price} to {size}. If {price} is not stored, do nothing.
 
 And two sides:
 
