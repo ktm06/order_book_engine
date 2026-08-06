@@ -6,9 +6,15 @@ More specifically, we have a L2 Order Book Engine inside the FPGA, where we stor
 
 # Chapters
 
-1. [Architecture](#Architecture)
-2. [SV File Structure](#Sv-file-structure)
-3. [Requirements](#Requirements)
+1. [The Hardware](#The-hardware)
+2. [Architecture](#Architecture)
+3. [SV File Structure](#Sv-file-structure)
+4. [Software Interface](#Software-interface)
+5. [Requirements](#Requirements)
+
+# The Hardware
+
+We use a [Terasic DE1-SoC FPGA](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&No=836) with the Intel Cyclone V device.
 
 # Architecture
 
@@ -57,5 +63,9 @@ Files used for RTL are accordingly placed in the ```rtl``` folder:
 ```
 
 For each of the unique modules, we also have a custom testbench, in ```tb``` folder. Each one was accurate and confirmed its respective module.
+
+# Software Interface
+
+We interface with the FPGA through a program, which generates data bits using USB blaster cable into our FPGA. The program is intended for a Windows device.
 
 # Requirements
