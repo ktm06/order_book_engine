@@ -69,6 +69,23 @@ For each of the unique modules, we also have a custom testbench, in ```tb``` fol
 
 # Software Interface
 
-We interface with the FPGA through a program, which generates data bits using USB blaster cable into our FPGA. The program is intended for a Windows device.
+We interface with the FPGA through a C++ program running on Windows. The program builds order messages per the ISA above, sends them to the FPGA over UART, and reads back the resulting spread.
+
+- **Sending.** The program opens the serial port at 115200 baud, 8 data bits, no parity,
+  one stop bit, and writes each 10-byte frame. The FPGA parses it, updates the book, and
+  computes the new spread.
+
+- **Reading the reply.** The FPGA returns a 4-byte big-endian spread. The program reads
+  the four bytes, reassembles the 32-bit value, and checks it against the expected spread.
+
+- **Session handling.** The order book persists in hardware until reset, so the program
+  resets the board at the start of each run and flushes stale bytes from the serial
+  buffer before sending the test sequence, keeping each run's replies aligned with its
+  messages.
+
+- **Test sequence.** The program runs a fixed 15-message sequence covering aggregation,
+  partial and full deletes, modify, worst-level eviction, and rejection of a level worse
+  than the current book, checking each returned spread against a hand-computed expected
+  value. All 15 pass on hardware.
 
 # Requirements
